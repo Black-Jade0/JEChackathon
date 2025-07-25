@@ -1,0 +1,147 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// User Management
+model User {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  email         String   @unique
+  name          String
+  role          UserRole @default(USER)
+  createdAt     DateTime @default(now())
+  
+  // Relations
+  eventsCreated Event[]
+  registrations Registration[]
+  
+  @@map("users")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+// Event Management
+model Event {
+  id              String      @id @default(auto()) @map("_id") @db.ObjectId
+  title           String
+  description     String
+  
+  // Event Details
+  category        EventCategory
+  startDate       DateTime
+  endDate         DateTime
+  location        String      // "Online" or venue name
+  
+  // Registration
+  maxParticipants Int?
+  registrationFee Float?      @default(0)
+  
+  // External Integration
+  isExternal      Boolean     @default(false)
+  externalUrl     String?     // Registration URL for external events
+  
+  // Media
+  bannerImage     String?
+  
+  // Status
+  isActive        Boolean     @default(true)
+  
+  // Analytics
+  viewCount       Int         @default(0)
+  
+  // Timestamps
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  
+  // Relations
+  createdById     String      @db.ObjectId
+  createdBy       User        @relation(fields: [createdById], references: [id])
+  registrations   Registration[]
+  
+  @@map("events")
+}
+
+enum EventCategory {
+  WEB_DEV
+  MOBILE_DEV
+  AI_ML
+  BLOCKCHAIN
+  GAME_DEV
+  DATA_SCIENCE
+  OTHER
+}
+
+// Registration Management
+model Registration {
+  id              String    @id @default(auto()) @map("_id") @db.ObjectId
+  
+  // Registration Details
+  registeredAt    DateTime  @default(now())
+  
+  // External tracking
+  isExternal      Boolean   @default(false)
+  clickedExternal Boolean   @default(false) // For analytics
+  
+  // Relations
+  userId          String    @db.ObjectId
+  user            User      @relation(fields: [userId], references: [id])
+  eventId         String    @db.ObjectId
+  event           Event     @relation(fields: [eventId], references: [id])
+  
+  @@unique([userId, eventId])
+  @@map("registrations")
+}
+
+// External API Sources (simplified)
+model ApiSource {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String   @unique // "Devpost", "EventBrite"
+  baseUrl     String
+  isActive    Boolean  @default(true)
+  lastSync    DateTime?
+  
+  events      ImportedEvent[]
+  
+  @@map("api_sources")
+}
+
+// Imported Events (simplified)
+model ImportedEvent {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  externalId    String    // ID from external platform
+  sourceId      String    @db.ObjectId
+  
+  title         String
+  description   String?
+  startDate     DateTime?
+  endDate       DateTime?
+  registrationUrl String?
+  imageUrl      String?
+  category      String?
+  
+  isProcessed   Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  
+  source        ApiSource @relation(fields: [sourceId], references: [id])
+  
+  @@unique([externalId, sourceId])
+  @@map("imported_events")
+}
+
+// Simple Analytics
+model Analytics {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  eventId     String?   @db.ObjectId
+  userId      String?   @db.ObjectId
+  action      String    // "view", "register", "external_click"
+  createdAt   DateTime  @default(now())
+  
+  @@map("analytics")
+}
